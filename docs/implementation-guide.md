@@ -8,51 +8,46 @@ This guide walks you through implementing the Scriber API based on the specifica
 
 ## Prerequisites
 
-- .NET 8.0 SDK
-- PostgreSQL 15+ (or Docker for PostgreSQL)
-- Azure Storage Emulator (Azurite) or Azure account
-- Stripe test account (for payments)
-- SendGrid account (for emails)
-- Your favorite IDE (Visual Studio, Rider, or VS Code)
+- Runtime environment for your chosen language (Node.js, Python, Go, Java, .NET, etc.)
+- Relational database (PostgreSQL 15+, MySQL 8+, or equivalent)
+- Object storage (S3-compatible, local filesystem, or cloud storage)
+- Payment provider test account (Stripe, PayPal, or equivalent)
+- Email service account (SendGrid, Mailgun, SES, or equivalent)
+- Your favorite IDE/editor
 
 ---
 
 ## Step 1: Run the Scaffolding Script
 
-```powershell
+```bash
 # From the repository root
-.\scripts\scaffold-project.ps1
+./scripts/scaffold-project.sh  # or .ps1 for Windows
 ```
 
 This creates:
-- Solution with 6 projects (Domain, Application, Infrastructure, API, 2 test projects)
+- Project structure with separate modules (Domain, Application, Infrastructure, API, Tests)
 - Folder structure following Clean Architecture
-- NuGet packages installed
-- Project references configured
-- Base classes (Entity, AggregateRoot, IMediator)
+- Dependencies installed
+- Module references configured
+- Base classes/interfaces (Entity, AggregateRoot, Mediator)
 
 ---
 
-## Step 2: Implement Custom Mediator
+## Step 2: Implement Command/Query Mediator
 
-**Location:** `src/Infrastructure/Scriber.Infrastructure/Messaging/`
+**Location:** `src/Infrastructure/Messaging/`
 
-Copy the complete implementation from **SPEC-2.2**:
-
-1. `Mediator.cs` - Core mediator implementation
-2. `MediatorExtensions.cs` - DI registration extensions
+Implement a mediator pattern or use an existing library for your language:
 
 **Files to create:**
-- `Messaging/Mediator.cs`
-- `Messaging/RequestHandlerDelegate.cs`
-- `Extensions/MediatorExtensions.cs`
+- `Messaging/Mediator` - Core mediator implementation
+- `Messaging/RequestHandler` - Handler interface/base class
+- `Extensions/MediatorRegistration` - Dependency injection setup
 
-**Register in `DependencyInjection.cs`:**
-
-```csharp
-services.AddMediator(
-    typeof(ApplicationAssemblyMarker).Assembly
-);
+**Register in your DI container:**
+- Scan and register all command/query handlers
+- Register pipeline behaviors (validation, logging, transactions)
+- Configure mediator as singleton or scoped service
 ```
 
 ---
@@ -63,53 +58,53 @@ services.AddMediator(
 
 ### 3.1 Publishing Context
 
-**Location:** `src/Core/Scriber.Domain/Publishing/`
+**Location:** `src/Domain/Publishing/`
 
 **Entities:**
-- `Post.cs` - Aggregate root with business logic
-- `Publication.cs`
-- `Tag.cs`
+- `Post` - Aggregate root with business logic
+- `Publication`
+- `Tag`
 
 **Value Objects:**
-- `ValueObjects/PostId.cs`
-- `ValueObjects/PostTitle.cs`
-- `ValueObjects/Slug.cs`
-- `ValueObjects/PostContent.cs`
-- `ValueObjects/Excerpt.cs`
-- `ValueObjects/PublicationId.cs`
-- `ValueObjects/AuthorId.cs`
-- `ValueObjects/TagId.cs`
+- `ValueObjects/PostId`
+- `ValueObjects/PostTitle`
+- `ValueObjects/Slug`
+- `ValueObjects/PostContent`
+- `ValueObjects/Excerpt`
+- `ValueObjects/PublicationId`
+- `ValueObjects/AuthorId`
+- `ValueObjects/TagId`
 
-**Enums:**
-- `PostStatus.cs` (Draft, Scheduled, Published)
-- `VisibilityTier.cs` (Public, FreeSubscriber, PaidSubscriber)
+**Enums/Constants:**
+- `PostStatus` (Draft, Scheduled, Published)
+- `VisibilityTier` (Public, FreeSubscriber, PaidSubscriber)
 
 **Domain Events:**
-- `Events/PostDraftedEvent.cs`
-- `Events/PostPublishedEvent.cs`
-- `Events/PostUpdatedEvent.cs`
-- `Events/PostScheduledEvent.cs`
-- `Events/PostUnpublishedEvent.cs`
+- `Events/PostDraftedEvent`
+- `Events/PostPublishedEvent`
+- `Events/PostUpdatedEvent`
+- `Events/PostScheduledEvent`
+- `Events/PostUnpublishedEvent`
 
 ### 3.2 Subscription Context
 
-**Location:** `src/Core/Scriber.Domain/Subscriptions/`
+**Location:** `src/Domain/Subscriptions/`
 
 **Entities:**
-- `Subscription.cs` - Aggregate root
-- `Subscriber.cs`
-- `SubscriptionTier.cs`
+- `Subscription` - Aggregate root
+- `Subscriber`
+- `SubscriptionTier`
 
 **Value Objects:**
-- `ValueObjects/SubscriptionId.cs`
-- `ValueObjects/SubscriberId.cs`
-- `ValueObjects/TierId.cs`
-- `ValueObjects/TrialPeriod.cs`
-- `ValueObjects/Money.cs`
+- `ValueObjects/SubscriptionId`
+- `ValueObjects/SubscriberId`
+- `ValueObjects/TierId`
+- `ValueObjects/TrialPeriod`
+- `ValueObjects/Money`
 
-**Enums:**
-- `SubscriptionStatus.cs` (Active, PastDue, Canceled, Trialing)
-- `BillingCycle.cs` (Monthly, Yearly)
+**Enums/Constants:**
+- `SubscriptionStatus` (Active, PastDue, Canceled, Trialing)
+- `BillingCycle` (Monthly, Yearly)
 
 **Domain Events:**
 - `Events/SubscriptionActivatedEvent.cs`
@@ -120,17 +115,17 @@ services.AddMediator(
 
 ### 3.3 Payment Context
 
-**Location:** `src/Core/Scriber.Domain/Payments/`
+**Location:** `src/Domain/Payments/`
 
 **Entities:**
-- `Payment.cs` - Aggregate root
+- `Payment` - Aggregate root
 
 **Value Objects:**
-- `ValueObjects/PaymentId.cs`
+- `ValueObjects/PaymentId`
 
-**Enums:**
-- `PaymentStatus.cs` (Pending, Succeeded, Failed, Refunded)
-- `PaymentProvider.cs` (Stripe, PayPal)
+**Enums/Constants:**
+- `PaymentStatus` (Pending, Succeeded, Failed, Refunded)
+- `PaymentProvider` (Stripe, PayPal, etc.)
 
 **Domain Events:**
 - `Events/PaymentSucceededEvent.cs`
@@ -144,42 +139,36 @@ services.AddMediator(
 
 ### 4.1 Common Exceptions
 
-**Location:** `src/Core/Scriber.Application/Common/Exceptions/`
+**Location:** `src/Application/Common/Exceptions/`
 
-```csharp
-// NotFoundException.cs
-// UnauthorizedException.cs
-// ForbiddenException.cs
-// ValidationException.cs
-```
+- `NotFoundException`
+- `UnauthorizedException`
+- `ForbiddenException`
+- `ValidationException`
 
 ### 4.2 Common Interfaces
 
-**Location:** `src/Core/Scriber.Application/Common/Interfaces/`
+**Location:** `src/Application/Common/Interfaces/`
 
-```csharp
-// IPostRepository.cs
-// ISubscriptionRepository.cs
-// ISubscriberRepository.cs
-// IPublishingDbContext.cs
-// ICurrentUserService.cs
-// IEmailService.cs
-// IPaymentService.cs
-// ISubscriptionService.cs
-// IBlobStorageService.cs
-```
+- `IPostRepository`
+- `ISubscriptionRepository`
+- `ISubscriberRepository`
+- `IDatabaseContext`
+- `ICurrentUserService`
+- `IEmailService`
+- `IPaymentService`
+- `ISubscriptionService`
+- `IObjectStorageService`
 
-### 4.3 Pipeline Behaviors
+### 4.3 Pipeline Behaviors/Middleware
 
-**Location:** `src/Core/Scriber.Application/Common/Behaviors/`
+**Location:** `src/Application/Common/Behaviors/`
 
-```csharp
-// IPipelineBehavior.cs
-// LoggingBehavior.cs
-// ValidationBehavior.cs
-// PerformanceBehavior.cs
-// TransactionBehavior.cs
-```
+- `IPipelineBehavior` (interface/base class)
+- `LoggingBehavior`
+- `ValidationBehavior`
+- `PerformanceBehavior`
+- `TransactionBehavior`
 
 ### 4.4 Publishing Commands
 
@@ -334,28 +323,28 @@ Register:
 
 ## Step 6: Create Database Migrations
 
+Use your ORM's migration tool to create and apply database migrations:
+
+**Examples by ORM:**
+
 ```bash
-# Install EF Core CLI tools (if not already)
-dotnet tool install --global dotnet-ef
+# Entity Framework Core (.NET)
+dotnet ef migrations add InitialCreate
+dotnet ef database update
 
-# Add initial migration
-dotnet ef migrations add InitialCreate \
-  --project src/Infrastructure/Scriber.Infrastructure \
-  --startup-project src/Presentation/Scriber.API \
-  --context PublishingDbContext \
-  --output-dir Persistence/Migrations/Publishing
+# TypeORM (TypeScript/Node.js)
+npm run typeorm migration:generate -- -n InitialCreate
+npm run typeorm migration:run
 
-# Repeat for other contexts
-dotnet ef migrations add InitialCreate \
-  --project src/Infrastructure/Scriber.Infrastructure \
-  --startup-project src/Presentation/Scriber.API \
-  --context SubscriptionDbContext \
-  --output-dir Persistence/Migrations/Subscriptions
+# Alembic (Python/SQLAlchemy)
+alembic revision --autogenerate -m "Initial create"
+alembic upgrade head
 
-# Update database
-dotnet ef database update \
-  --project src/Infrastructure/Scriber.Infrastructure \
-  --startup-project src/Presentation/Scriber.API
+# Flyway (Java/JVM)
+flyway migrate
+
+# Liquibase (Java/JVM)
+liquibase update
 ```
 
 ---
@@ -364,69 +353,72 @@ dotnet ef database update \
 
 **Reference:** SPEC-6 (API Contracts)
 
-### 7.1 Controllers
+### 7.1 API Endpoints/Controllers
 
-**Location:** `src/Presentation/Scriber.API/Controllers/`
+**Location:** `src/API/Controllers/` or `src/API/Routes/`
 
-```csharp
-// AuthController.cs
-// PublicationsController.cs
-// PostsController.cs
-// SubscriptionsController.cs
-// MediaController.cs
-// WebhooksController.cs
-```
+- `AuthController` / `auth.routes`
+- `PublicationsController` / `publications.routes`
+- `PostsController` / `posts.routes`
+- `SubscriptionsController` / `subscriptions.routes`
+- `MediaController` / `media.routes`
+- `WebhooksController` / `webhooks.routes`
 
-### 7.2 Filters & Middleware
+### 7.2 Middleware & Error Handling
 
-**Location:** `src/Presentation/Scriber.API/Filters/`
+**Location:** `src/API/Middleware/`
 
-```csharp
-// GlobalExceptionFilter.cs - Centralized error handling
-```
+- `GlobalExceptionHandler` - Centralized error handling
+- `RequestLoggingMiddleware` - Request/response logging
+- `AuthenticationMiddleware` - JWT validation
 
 ### 7.3 Configuration
 
-**Location:** `src/Presentation/Scriber.API/`
+**Location:** `src/API/`
 
-**Program.cs** - Configure:
+**Application entry point** - Configure:
 - JWT authentication
-- Swagger/OpenAPI
+- API documentation (Swagger/OpenAPI)
 - CORS
 - Rate limiting
 - Health checks
-- Logging (Serilog)
+- Logging
 
-**appsettings.json:**
+**Configuration file (JSON/YAML/ENV):**
 
-```json
-{
-  "ConnectionStrings": {
-    "DefaultConnection": "Host=localhost;Database=scriber;Username=postgres;Password=yourpassword"
-  },
-  "Jwt": {
-    "Issuer": "https://api.scriber.com",
-    "Audience": "https://api.scriber.com",
-    "SecretKey": "your-256-bit-secret-key-change-in-production",
-    "ExpiresInMinutes": 60
-  },
-  "Email": {
-    "ApiKey": "SG.your-sendgrid-api-key",
-    "FromEmail": "noreply@scriber.com",
-    "FromName": "Scriber"
-  },
-  "Stripe": {
-    "SecretKey": "sk_test_your-stripe-secret-key",
-    "WebhookSecret": "whsec_your-webhook-secret"
-  },
-  "BlobStorage": {
-    "ConnectionString": "UseDevelopmentStorage=true",
-    "BlobEndpoint": "http://127.0.0.1:10000/devstoreaccount1"
-  },
-  "Cors": {
-    "AllowedOrigins": ["http://localhost:3000"]
-  }
-}
+```yaml
+Database:
+  ConnectionString: "postgresql://localhost:5432/scriber"
+  # or: "mysql://localhost:3306/scriber"
+  # or: "mongodb://localhost:27017/scriber"
+
+JWT:
+  Issuer: "https://api.scriber.com"
+  Audience: "https://api.scriber.com"
+  SecretKey: "your-256-bit-secret-key-change-in-production"
+  ExpiresInMinutes: 60
+
+Email:
+  Provider: "sendgrid"  # or "mailgun", "ses", etc.
+  ApiKey: "your-email-provider-api-key"
+  FromEmail: "noreply@scriber.com"
+  FromName: "Scriber"
+
+Payments:
+  Provider: "stripe"  # or "paypal", "square", etc.
+  SecretKey: "your-payment-provider-secret-key"
+  WebhookSecret: "your-webhook-secret"
+
+ObjectStorage:
+  Provider: "s3"  # or "minio", "gcs", "azure", etc.
+  Endpoint: "http://localhost:9000"
+  AccessKey: "your-access-key"
+  SecretKey: "your-secret-key"
+  BucketName: "scriber-media"
+
+CORS:
+  AllowedOrigins:
+    - "http://localhost:3000"
 ```
 
 ---
@@ -490,38 +482,44 @@ public class PostsControllerTests : IClassFixture<WebApplicationFactory<Program>
 
 ## Step 9: Local Development Setup
 
-### 9.1 Start PostgreSQL (Docker)
+### 9.1 Start Database (Docker)
 
 ```bash
-docker run --name scriber-postgres \
+# PostgreSQL
+docker run --name scriber-db \
   -e POSTGRES_PASSWORD=yourpassword \
   -e POSTGRES_DB=scriber \
   -p 5432:5432 \
   -d postgres:15
+
+# OR MySQL
+docker run --name scriber-db \
+  -e MYSQL_ROOT_PASSWORD=yourpassword \
+  -e MYSQL_DATABASE=scriber \
+  -p 3306:3306 \
+  -d mysql:8
 ```
 
-### 9.2 Start Azurite (Azure Storage Emulator)
+### 9.2 Start Object Storage (Docker)
 
 ```bash
-docker run -p 10000:10000 -p 10001:10001 -p 10002:10002 \
-  mcr.microsoft.com/azure-storage/azurite
+# MinIO (S3-compatible)
+docker run --name scriber-storage \
+  -p 9000:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=admin \
+  -e MINIO_ROOT_PASSWORD=yourpassword \
+  -d minio/minio server /data --console-address ":9001"
 ```
 
 ### 9.3 Run Migrations
 
-```bash
-dotnet ef database update \
-  --project src/Infrastructure/Scriber.Infrastructure \
-  --startup-project src/Presentation/Scriber.API
-```
+Run your ORM's migration command (see Step 6)
 
 ### 9.4 Run the API
 
-```bash
-dotnet run --project src/Presentation/Scriber.API
-```
+Start your application using your language/framework's command
 
-Open browser: `https://localhost:5001/swagger`
+Open browser: `http://localhost:PORT/docs` or `/swagger`
 
 ---
 
@@ -594,39 +592,41 @@ dotnet test --filter "FullyQualifiedName~PostTests"
 
 ---
 
-## Production Deployment (Azure)
+## Production Deployment
 
 ### Prerequisites
 
-- Azure subscription
-- Azure CLI installed
-- Bicep templates (create separately or use Azure Portal)
+- Cloud provider account or on-premises infrastructure
+- CLI tools for your deployment platform
+- Infrastructure as Code templates (Terraform, Pulumi, etc.)
 
 ### Resources to Create
 
-1. **Azure Container Apps** - API hosting
-2. **Azure Database for PostgreSQL (Flexible Server)** - Database
-3. **Azure Blob Storage** - Media files
-4. **Azure CDN** - Media delivery
-5. **Azure Application Insights** - Monitoring
-6. **Azure Key Vault** - Secrets management
+1. **Container Platform** - API hosting (Kubernetes, ECS, Cloud Run, etc.)
+2. **Managed Database** - PostgreSQL/MySQL database service
+3. **Object Storage** - S3-compatible or cloud storage for media files
+4. **CDN** - Content delivery network for media
+5. **Monitoring** - Observability platform (Prometheus/Grafana, DataDog, etc.)
+6. **Secrets Management** - Vault or secrets manager service
 
 ### Deployment Steps
 
 ```bash
-# Login to Azure
-az login
-
-# Build and push Docker image
+# Build Docker image
 docker build -t scriber-api:latest .
-docker tag scriber-api:latest yourregistry.azurecr.io/scriber-api:latest
-docker push yourregistry.azurecr.io/scriber-api:latest
 
-# Deploy to Container Apps
-az containerapp update \
-  --name scriber-api \
-  --resource-group scriber-rg \
-  --image yourregistry.azurecr.io/scriber-api:latest
+# Tag and push to registry
+docker tag scriber-api:latest your-registry.com/scriber-api:latest
+docker push your-registry.com/scriber-api:latest
+
+# Deploy using your platform
+# Kubernetes:
+kubectl apply -f k8s/deployment.yaml
+
+# Cloud-specific CLI:
+# AWS: aws ecs update-service ...
+# GCP: gcloud run deploy ...
+# Azure: az containerapp update ...
 ```
 
 ---
@@ -635,14 +635,14 @@ az containerapp update \
 
 ### Common Issues
 
-**Issue:** "No service for type 'IMediator' has been registered"
-- **Solution:** Ensure `AddMediator()` is called in Infrastructure DI setup
+**Issue:** "Mediator/Handler not registered"
+- **Solution:** Ensure mediator and all handlers are registered in your DI container
 
-**Issue:** EF Core migrations fail
-- **Solution:** Check connection string, ensure PostgreSQL is running
+**Issue:** Database migrations fail
+- **Solution:** Check connection string, ensure database server is running and accessible
 
 **Issue:** JWT authentication fails
-- **Solution:** Verify JWT secret key matches in appsettings.json
+- **Solution:** Verify JWT secret key matches in configuration file
 
 **Issue:** Stripe webhook signature invalid
 - **Solution:** Use correct webhook secret from Stripe dashboard
@@ -652,11 +652,11 @@ az containerapp update \
 ## Next Steps
 
 1. Implement remaining bounded contexts (Media, Notifications)
-2. Add background jobs (Azure Functions) for scheduled posts
+2. Add background job processing for scheduled posts (workers, cron jobs, serverless functions)
 3. Implement analytics tracking
-4. Add caching layer (Redis)
-5. Set up CI/CD pipeline (GitHub Actions)
-6. Configure monitoring and alerts
+4. Add caching layer (Redis, Memcached, or in-memory cache)
+5. Set up CI/CD pipeline (GitHub Actions, GitLab CI, Jenkins, etc.)
+6. Configure monitoring, logging, and alerting
 
 ---
 
@@ -664,6 +664,8 @@ az containerapp update \
 
 - [Clean Architecture](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
 - [Domain-Driven Design](https://martinfowler.com/bliki/DomainDrivenDesign.html)
-- [EF Core Documentation](https://docs.microsoft.com/ef/core/)
-- [ASP.NET Core Documentation](https://docs.microsoft.com/aspnet/core/)
-- [Stripe API Reference](https://stripe.com/docs/api)
+- [CQRS Pattern](https://martinfowler.com/bliki/CQRS.html)
+- [Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html)
+- [API Design Best Practices](https://swagger.io/resources/articles/best-practices-in-api-design/)
+- Payment Provider Documentation (Stripe, PayPal, etc.)
+- Email Service Documentation (SendGrid, Mailgun, SES, etc.)
