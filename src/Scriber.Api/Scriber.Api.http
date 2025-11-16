@@ -1,0 +1,6 @@
+@Scriber.Api_HostAddress = http://localhost:5058
+
+GET {{Scriber.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
