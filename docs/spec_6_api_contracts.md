@@ -38,7 +38,7 @@ This document defines the REST API contracts for Scriber API, including endpoint
 │   ├── POST /cancel
 │   └── POST /upgrade
 ├── media/
-│   ├── POST /upload-token
+│   ├── POST /upload-url
 │   └── GET /{id}
 └── webhooks/
     ├── POST /stripe

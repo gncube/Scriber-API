@@ -694,15 +694,15 @@ public class DomainException : Exception
 ## Frugal Implementation Notes
 
 ### Single Database, Multiple Schemas
-- Start with one Azure SQL Database (Serverless tier)
+- Start with one relational database (PostgreSQL or MySQL recommended)
 - Separate schema per bounded context: `Publishing`, `Subscription`, `Payment`
 - Aggregate roots own their tables, no foreign keys across schemas
 - Use views for cross-context queries (read models)
 
 ### In-Process Event Bus (Phase 1)
-- Use **MediatR** for domain event handling
+- Use custom event dispatcher or open-source library for domain event handling
 - Events published synchronously within same transaction
-- Upgrade to Azure Service Bus when splitting into microservices
+- Upgrade to message broker (RabbitMQ, Kafka, NATS) when splitting into microservices
 
 ### Repository Pattern per Aggregate
 ```csharp
@@ -716,11 +716,12 @@ public interface IPostRepository
 }
 ```
 
-### EF Core Configuration
-- One `DbContext` per bounded context
-- Use **Owned Entities** for value objects
-- Use **Table Splitting** for aggregate root + value objects in same table
-- Enable **Query Filters** for soft deletes and multi-tenancy
+### ORM Configuration
+- One database context per bounded context
+- Use owned entities or embedded objects for value objects
+- Use table splitting for aggregate root + value objects in same table when appropriate
+- Enable query filters for soft deletes and multi-tenancy
+- Examples: Entity Framework Core (.NET), Hibernate (Java), SQLAlchemy (Python), TypeORM (TypeScript)
 
 ---
 

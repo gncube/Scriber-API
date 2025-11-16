@@ -7,9 +7,9 @@ This document defines the Infrastructure Layer for Scriber API, implementing per
 **Principles:**
 - Repository pattern per aggregate root
 - Unit of Work for transaction management
-- EF Core for ORM with explicit configurations
+- ORM with explicit configurations (Entity Framework Core, Hibernate, SQLAlchemy, etc.)
 - Separate schemas per bounded context
-- Domain events dispatched after SaveChanges
+- Domain events dispatched after transaction commit
 
 ---
 
@@ -984,72 +984,71 @@ public class StripeSettings
 }
 ```
 
-### 3. Blob Storage Service (Azure)
+### 3. Object Storage Service
 
 ```csharp
 namespace Scriber.Infrastructure.Services;
 
-using Azure.Storage.Blobs;
-using Azure.Storage.Sas;
 using Scriber.Application.Common.Interfaces;
 using Microsoft.Extensions.Options;
 
-public class BlobStorageService : IBlobStorageService
+// Example using S3-compatible storage
+public class ObjectStorageService : IObjectStorageService
 {
-    private readonly BlobServiceClient _blobServiceClient;
-    private readonly BlobStorageSettings _settings;
+    private readonly ObjectStorageSettings _settings;
 
-    public BlobStorageService(IOptions<BlobStorageSettings> settings)
+    public ObjectStorageService(IOptions<ObjectStorageSettings> settings)
     {
         _settings = settings.Value;
-        _blobServiceClient = new BlobServiceClient(_settings.ConnectionString);
     }
 
-    public async Task<string> GetUploadSasTokenAsync(
+    public async Task<string> GetPresignedUploadUrlAsync(
         string containerName,
-        string blobName,
+        string objectKey,
         TimeSpan expiresIn,
         CancellationToken cancellationToken = default)
     {
-        var containerClient = _blobServiceClient.GetBlobContainerClient(containerName);
-        await containerClient.CreateIfNotExistsAsync(cancellationToken: cancellationToken);
+        // Example implementation using S3-compatible API
+        // In production, use AWS SDK, MinIO SDK, or similar
+        var presignedUrl = GeneratePresignedUrl(
+            _settings.Endpoint,
+            _settings.BucketName,
+            objectKey,
+            expiresIn);
 
-        var blobClient = containerClient.GetBlobClient(blobName);
-
-        var sasBuilder = new BlobSasBuilder
-        {
-            BlobContainerName = containerName,
-            BlobName = blobName,
-            Resource = "b",
-            ExpiresOn = DateTimeOffset.UtcNow.Add(expiresIn)
-        };
-        sasBuilder.SetPermissions(BlobSasPermissions.Write | BlobSasPermissions.Create);
-
-        var sasToken = blobClient.GenerateSasUri(sasBuilder).ToString();
-        return sasToken;
+        return await Task.FromResult(presignedUrl);
     }
 
-    public string GetBlobUrl(string containerName, string blobName)
+    public string GetObjectUrl(string containerName, string objectKey)
     {
-        return $"{_settings.BlobEndpoint}/{containerName}/{blobName}";
+        return $"{_settings.Endpoint}/{containerName}/{objectKey}";
+    }
+
+    private string GeneratePresignedUrl(string endpoint, string bucket, string key, TimeSpan expiresIn)
+    {
+        // Implementation depends on storage provider SDK
+        // AWS S3, MinIO, GCS, etc.
+        throw new NotImplementedException("Implement based on your storage provider");
     }
 }
 
-public class BlobStorageSettings
+public class ObjectStorageSettings
 {
-    public string ConnectionString { get; set; } = string.Empty;
-    public string BlobEndpoint { get; set; } = string.Empty;
+    public string Endpoint { get; set; } = string.Empty;
+    public string AccessKey { get; set; } = string.Empty;
+    public string SecretKey { get; set; } = string.Empty;
+    public string BucketName { get; set; } = string.Empty;
 }
 
-public interface IBlobStorageService
+public interface IObjectStorageService
 {
-    Task<string> GetUploadSasTokenAsync(
+    Task<string> GetPresignedUploadUrlAsync(
         string containerName,
-        string blobName,
+        string objectKey,
         TimeSpan expiresIn,
         CancellationToken cancellationToken = default);
     
-    string GetBlobUrl(string containerName, string blobName);
+    string GetObjectUrl(string containerName, string objectKey);
 }
 ```
 

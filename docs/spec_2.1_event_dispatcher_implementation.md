@@ -6,18 +6,19 @@ This document provides a lightweight, zero-cost alternative to MediatR for handl
 
 ---
 
-## Why Not MediatR?
+## Why Custom Event Dispatcher?
 
-**MediatR v12+ Licensing:**
-- Requires commercial license (~$100/developer/year)
-- For a 5-developer team over 3 years: **$1,500 in licensing costs**
-- This violates our frugal innovation principles
+**Benefits of Custom Implementation:**
+- Zero licensing costs and dependencies
+- Full control and understanding of event flow
+- Lightweight and performant
+- Easy to understand and maintain
 
 **Our Alternative:**
 - Custom event dispatcher (~100 lines of code)
 - Zero licensing costs
 - Full control and understanding
-- Easy migration path to distributed messaging (Azure Service Bus)
+- Easy migration path to distributed messaging (RabbitMQ, Kafka, or cloud message queues)
 
 ---
 
@@ -373,11 +374,12 @@ public class AzureServiceBusEventDispatcher : IDomainEventDispatcher
 - **Latency**: <1ms per event
 - **Memory**: Minimal (no message queue overhead)
 
-### When to Migrate to Azure Service Bus
+### When to Migrate to Message Broker
 - Multiple microservices need to consume events
 - Need guaranteed delivery / retry logic
 - Event replay requirements
 - Audit trail in external system
+- Cross-language or cross-platform communication
 
 ---
 
@@ -424,9 +426,9 @@ public class InMemoryEventDispatcherTests
 
 | Solution | Year 1 Cost | Year 3 Cost | Pros | Cons |
 |----------|-------------|-------------|------|------|
-| **MediatR v12+** | $500 (5 devs) | $1,500 | Pipeline behaviors, mature | Licensing cost, vendor lock-in |
-| **Custom Dispatcher** | $0 | $0 | Full control, zero cost | ~4 hours initial dev time |
-| **Wolverine** | $0 | $0 | Feature-rich, free | Learning curve, more opinionated |
+| **Custom Dispatcher** | $0 | $0 | Full control, zero cost, simple | ~4 hours initial dev time |
+| **Wolverine** | $0 | $0 | Feature-rich, free, MIT license | Learning curve, more opinionated |
+| **Brighter** | $0 | $0 | Mature, command processor | Additional abstraction layer |
 
 **Recommendation:** Start with custom dispatcher, evaluate Wolverine if you need advanced features.
 
@@ -434,10 +436,11 @@ public class InMemoryEventDispatcherTests
 
 ## Summary
 
-✅ **Zero licensing costs** (save $1,500 over 3 years)  
+✅ **Zero licensing costs** and dependencies  
 ✅ **Simple implementation** (~100 lines of code)  
-✅ **Easy migration path** to Azure Service Bus  
+✅ **Easy migration path** to any message broker  
 ✅ **Full control** over event flow  
-✅ **Testable** with standard .NET patterns  
+✅ **Testable** with standard patterns  
+✅ **Language agnostic** (adaptable to any platform)  
 
 This approach perfectly aligns with frugal innovation principles while maintaining professional code quality.

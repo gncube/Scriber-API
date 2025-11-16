@@ -2,7 +2,7 @@
 
 ## Overview
 
-A lightweight, production-ready implementation that provides the same developer experience as MediatR, but with zero licensing costs and full control. This implementation supports:
+A lightweight, production-ready implementation that provides a familiar CQRS pattern, with zero dependencies and full control. This implementation supports:
 
 - ✅ Commands (IRequest/IRequestHandler)
 - ✅ Queries (IRequest<TResponse>/IRequestHandler<TRequest, TResponse>)

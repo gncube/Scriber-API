@@ -161,7 +161,7 @@ This document defines the bounded contexts, domain models, and ubiquitous langua
 - **MediaAsset** - Uploaded file (image, video, document)
 - **Upload** - Transfer of file to storage
 - **CDN** - Content delivery network
-- **SAS Token** - Shared Access Signature for secure upload
+- **Presigned URL** - Time-limited URL for secure upload
 
 **Aggregates:**
 - **MediaAsset Aggregate** (Root: MediaAsset)
@@ -283,14 +283,14 @@ This document defines the bounded contexts, domain models, and ubiquitous langua
 
 3. **Phase 3 (Scale)**: Full microservices
    - Split contexts into independent services
-   - API Gateway (Azure APIM) for orchestration
+   - API Gateway (Kong, Tyk, or cloud-managed) for orchestration
 
-### Cost-Effective Azure Services
-- **Compute**: Azure Container Apps (consumption-based, auto-scale to zero)
-- **Database**: Azure SQL Database Serverless (pause when idle)
-- **Messaging**: Azure Service Bus Basic tier → Standard when needed
-- **Storage**: Blob Storage with lifecycle policies (archive cold data)
-- **Monitoring**: Application Insights with sampling (reduce ingestion costs)
+### Cost-Effective Cloud Services
+- **Compute**: Container platforms with auto-scaling (Kubernetes, managed container services)
+- **Database**: Serverless or managed relational databases (PostgreSQL, MySQL) with auto-pause capabilities
+- **Messaging**: Managed message queues or open-source (RabbitMQ, Kafka, NATS)
+- **Storage**: Object storage with lifecycle policies (S3-compatible services)
+- **Monitoring**: Open-source observability stack (Prometheus, Grafana, Loki) or cloud-native monitoring
 
 ### Technical Debt Management
 - Keep bounded context boundaries clean from day 1

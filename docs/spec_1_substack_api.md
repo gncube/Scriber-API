@@ -6,7 +6,7 @@ Many writers want an easy, focused platform to publish newsletters, host subscri
 
 **Confirmed constraints & assumptions:**
 - Product: **RESTful API only** (frontend built by client team).
-- Cloud: **Microsoft Azure** (use Azure-managed services where possible).
+- Cloud: **Vendor Agnostic** (deployable on any major cloud provider or on-premises).
 - Initial scale: small to medium (1–10k MAU), design for easy horizontal scaling.
 - Payment and email integrations via webhooks/3rd-party (no built-in payment processor UIs).
 - Authentication: token-based (JWT) and OAuth2 support for integrations.
@@ -24,14 +24,14 @@ Many writers want an easy, focused platform to publish newsletters, host subscri
 - Paywalled content support: post-level visibility flags (public, free-subscriber, paid-subscriber), paywall enforcement in API.
 - RESTful pagination, filtering, sorting, and full-text search support for posts (API-level). 
 - Audit logs for critical actions (publish, payment events, role changes).
-- Rate limiting and basic DDoS protections (Azure API Management + policies).
+- Rate limiting and basic DDoS protections.
 - HTTPS-only, secure headers, and OWASP best practices.
 
 ### Should
 - Webhook endpoints to notify frontends and third-party services about events (new post, payment succeeded, subscription canceled).
 - Analytics events for opens, clicks, subscription conversions (basic event stream stored and exportable).
-- Media (image) upload handling with Azure Blob Storage and automatic CDN (Azure CDN) invalidation.
-- Background job processing for email sending, subscription checks, and analytics (Azure Functions / Durable Functions / Azure WebJobs).
+- Media (image) upload handling with object storage and automatic CDN invalidation.
+- Background job processing for email sending, subscription checks, and analytics.
 - Multi-tenant support (per-publication theming and domain mapping).
 
 ### Could
@@ -51,33 +51,33 @@ Many writers want an easy, focused platform to publish newsletters, host subscri
 
 ### Architecture overview (MVP)
 
-Components (Azure-focused):
-- **API Layer:** Containerized REST API (FastAPI/Node.js/ASP.NET Core) deployed to **Azure Container Apps** or **Azure App Service** behind **Azure API Management** (APIM) for authentication, rate-limiting, and routing.
-- **Auth & Identity:** **Azure AD B2C** for customer identity (optional) or in-app JWT via Auth server + **Azure Key Vault** for signing keys. Support OAuth2 for integrations.
-- **Primary Database:** **Azure Database for PostgreSQL (Flexible Server)** — relational store for users, posts, subscriptions, payments metadata. Use pgcrypto and Postgres full-text search (or integrate with Azure Cognitive Search for advanced search).
-- **Cache & Sessions:** **Azure Cache for Redis** — caching public post lists, rate-limiting counters, job dedup keys.
-- **Object Storage & CDN:** **Azure Blob Storage** for media assets + **Azure CDN** for distribution.
-- **Background Processing & Webhooks:** **Azure Functions** (Durable Functions for orchestrations) + **Azure Service Bus** for event queuing between API and workers.
-- **Email & Payments:** Integrate external providers (Stripe webhooks; SendGrid for emails). Expose webhook endpoints to ingest events.
-- **Observability:** **Azure Application Insights** (traces, metrics), **Azure Monitor** alerts.
-- **Secrets:** **Azure Key Vault** for API keys, DB credentials, webhook secrets.
+Components (vendor-agnostic):
+- **API Layer:** Containerized REST API (FastAPI/Node.js/ASP.NET Core/Go/Java) deployed to container orchestration platform (Kubernetes, Docker Swarm, or managed container services) behind an **API Gateway** for authentication, rate-limiting, and routing.
+- **Auth & Identity:** OAuth2/OIDC provider (Auth0, Keycloak, or similar) or in-app JWT via Auth server with secure key management for signing keys. Support OAuth2 for integrations.
+- **Primary Database:** **PostgreSQL** or **MySQL** — relational store for users, posts, subscriptions, payments metadata. Use native full-text search capabilities or integrate with dedicated search engine (Elasticsearch, Solr, Meilisearch).
+- **Cache & Sessions:** **Redis** or **Memcached** — caching public post lists, rate-limiting counters, job dedup keys.
+- **Object Storage & CDN:** S3-compatible object storage (AWS S3, MinIO, Ceph) for media assets + CDN for distribution (Cloudflare, Fastly, or cloud provider CDN).
+- **Background Processing & Webhooks:** Background job processors (Celery, Bull, Hangfire, or cloud functions) + message queue (RabbitMQ, Apache Kafka, Redis, or cloud-managed queues) for event queuing between API and workers.
+- **Email & Payments:** Integrate external providers (Stripe webhooks; SendGrid/Mailgun/SES for emails). Expose webhook endpoints to ingest events.
+- **Observability:** Distributed tracing (OpenTelemetry), metrics collection (Prometheus, Grafana), centralized logging (ELK stack, Loki, or cloud logging services).
+- **Secrets:** Secrets management solution (HashiCorp Vault, cloud provider secret managers, or encrypted configuration) for API keys, DB credentials, webhook secrets.
 
-Deployment & Infra IaC: Use **Bicep** or **Terraform** for reproducible infra.
+Deployment & Infra IaC: Use **Terraform**, **Pulumi**, or cloud-specific tools (Bicep, CloudFormation) for reproducible infra.
 
 
 ### High-level data flow
 1. Frontend calls API for content/subscription actions.
-2. API validates JWT + role, persists changes in Postgres and emits events to Service Bus.
-3. Background worker (Azure Function) consumes events for tasks: send email via SendGrid, sync with Stripe, update analytics.
-4. Payments provider posts to webhook endpoint; API verifies signature (Key Vault secret) and updates subscription/payment state, emits events.
-5. Blob uploads happen via presigned SAS tokens from API; CDN serves media.
+2. API validates JWT + role, persists changes in database and emits events to message queue.
+3. Background worker consumes events for tasks: send email via email provider, sync with Stripe, update analytics.
+4. Payments provider posts to webhook endpoint; API verifies signature (using stored secret) and updates subscription/payment state, emits events.
+5. Blob uploads happen via presigned URLs from API; CDN serves media.
 
 
 ### Security & multi-tenant considerations
 - Tenancy: add `publication_id` on all tenant-scoped tables; enforce publication scoping in middleware.
-- Rate limiting: APIM policies + Redis token buckets for aggressive endpoints.
-- Webhook verification: use provider signatures (Stripe `t`+`sig`) validated using Key Vault secret.
-- Protect sensitive PII fields at rest & in transit; use field-level encryption if necessary (pgcrypto or application-level).
+- Rate limiting: API Gateway policies + Redis token buckets for aggressive endpoints.
+- Webhook verification: use provider signatures (Stripe `t`+`sig`) validated using stored secret.
+- Protect sensitive PII fields at rest & in transit; use field-level encryption if necessary (database encryption or application-level).
 - Audit logs: append-only `audit_logs` table with `actor_id`, `action`, `resource_type`, `resource_id`, `payload`.
 
 
@@ -225,7 +225,7 @@ Subscriptions & payments:
 - GET /publications/{pub}/subscribers/{id} (auth limited)
 
 Media:
-- POST /publications/{pub}/media/sas -> returns SAS upload token + target path
+- POST /publications/{pub}/media/upload-url -> returns presigned upload URL + target path
 - GET /publications/{pub}/media/{id}
 
 Webhooks & events:
@@ -240,68 +240,67 @@ Admin:
 ### Background jobs & algorithms
 - **Subscription reconciliation worker:** consumes Stripe events; idempotency keys stored in Redis to avoid double-processing. On event: map stripe_subscription_id -> subscriptions row, update status, emit notification event.
 - **Paywall enforcement:** API reads `visibility` + subscription status; algorithm: if post.visibility == 'public' -> serve full; if 'free_subscriber' -> check subscribers table for active subscription (free or paid); if 'paid_subscriber' -> require active paid subscription tier.
-- **Search:** lightweight using Postgres tsvector indexed on title + content; for larger scale, sync to Azure Cognitive Search via Service Bus.
-- **Email send batching:** group sends by publication and template; use durable function to send in batches with exponential backoff on transient failures.
+- **Search:** lightweight using PostgreSQL tsvector indexed on title + content; for larger scale, sync to dedicated search engine (Elasticsearch, Meilisearch) via message queue.
+- **Email send batching:** group sends by publication and template; use background job orchestration to send in batches with exponential backoff on transient failures.
 
 
 ## Implementation
 
 ### Tech stack recommendations (MVP)
-- Language: **TypeScript (Node + Fastify)** or **Python (FastAPI)** — both have great async ecosystems and are container-friendly.
-- ORM: **Prisma** (TypeScript) or **SQLAlchemy + Alembic** (Python) for migrations and schema management.
-- Background: **Azure Functions** (Python/Node) or a container worker pool on Azure Container Instances/Apps.
-- Infra as Code: **Bicep** for Azure resources or **Terraform** if you prefer multi-cloud.
-- CI/CD: GitHub Actions -> build container -> push to ACR -> deploy to Azure Container Apps.
-- Observability: Application Insights + structured logging (JSON) + distributed tracing.
+- Language: **TypeScript (Node + Fastify/Express)**, **Python (FastAPI/Django)**, **Go (Gin/Echo)**, **Java (Spring Boot)**, or **C# (ASP.NET Core)** — choose based on team expertise and ecosystem fit.
+- ORM: **Prisma** (TypeScript), **SQLAlchemy + Alembic** (Python), **GORM** (Go), **Hibernate** (Java), or **Entity Framework Core** (C#) for migrations and schema management.
+- Background: Containerized workers or serverless functions with job queue integration (Celery, Bull, Hangfire, or cloud functions).
+- Infra as Code: **Terraform** or **Pulumi** for cloud-agnostic infrastructure, or cloud-specific tools if preferred.
+- CI/CD: GitHub Actions, GitLab CI, Jenkins, or CircleCI -> build container -> push to registry -> deploy to container platform.
+- Observability: OpenTelemetry + Prometheus/Grafana or cloud-native monitoring + structured logging (JSON) + distributed tracing.
 
 
 ### Implementation steps (high level)
-1. Scaffold API project + authentication module + Postgres schema migrations.
+1. Scaffold API project + authentication module + database schema migrations.
 2. Implement core models: publications, users, posts, subscribers, tiers, subscriptions.
-3. Add Stripe webhook handler + local emulator tests; add SAS media upload endpoints.
+3. Add Stripe webhook handler + local emulator tests; add presigned URL media upload endpoints.
 4. Implement paywall logic and protected content endpoints.
-5. Add background workers for email & subscription reconciliation; wire Service Bus.
-6. Add APIM configuration, rate limiting policies.
+5. Add background workers for email & subscription reconciliation; wire message queue.
+6. Add API Gateway configuration, rate limiting policies.
 7. Add telemetry, monitoring, and alerting.
 8. Load test basic flows (post publishing, subscribe, webhook ingestion) and optimize indexes & caching.
 
 
 ## Milestones
-1. Week 0–2: Project scaffolding, infra IaC (Postgres, Redis, Blob), auth, core DB models.
+1. Week 0–2: Project scaffolding, infra IaC (database, cache, object storage), auth, core DB models.
 2. Week 3–4: Posts API, media upload flow, paywall enforcement, basic public endpoints.
 3. Week 5–6: Stripe integration + webhook handling + subscription lifecycle.
-4. Week 7–8: Background workers, email integration (SendGrid), webhooks for events.
-5. Week 9–10: APIM, rate-limiting, monitoring, and hardening; staging deployment and smoke tests.
+4. Week 7–8: Background workers, email integration, webhooks for events.
+5. Week 9–10: API Gateway, rate-limiting, monitoring, and hardening; staging deployment and smoke tests.
 
 
 ## Gathering Results
-- Key success metrics: time-to-first-publish, subscription conversion rate, webhook processing latency, error rates in Application Insights.
-- Post-launch: run a 72-hour soak test with synthetic traffic replicating expected patterns; use results to tune DB indices, Redis TTLs, and function concurrency.
+- Key success metrics: time-to-first-publish, subscription conversion rate, webhook processing latency, error rates in monitoring system.
+- Post-launch: run a 72-hour soak test with synthetic traffic replicating expected patterns; use results to tune DB indices, Redis TTLs, and worker concurrency.
 
 
-## PlantUML Architecture Diagram
+## Architecture Diagram
 
 ```plantuml
 @startuml
-!define AWSPUML https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v14.0/Advanced/AWSPUML
 actor "Frontend App" as F
-node "APIM" as APIM
-node "Container Apps / App Service (API)" as API
-queue "Service Bus" as SB
-node "Azure Functions / Workers" as WF
-database "Postgres (Azure DB)" as PG
+node "API Gateway" as GW
+node "Container Platform (API)" as API
+queue "Message Queue" as MQ
+node "Background Workers" as WF
+database "Relational DB (PostgreSQL/MySQL)" as DB
 queue "Redis Cache" as REDIS
-storage "Blob Storage + CDN" as BLOB
-cloud "Stripe / SendGrid" as EX
-F --> APIM --> API
-API --> PG
+storage "Object Storage + CDN" as BLOB
+cloud "Stripe / Email Provider" as EX
+F --> GW --> API
+API --> DB
 API --> REDIS
-API --> SB
+API --> MQ
 API --> BLOB
-SB --> WF
+MQ --> WF
 WF --> EX
-WF --> PG
-APIM --> EX : webhooks
+WF --> DB
+GW --> EX : webhooks
 @enduml
 ```
 

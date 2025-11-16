@@ -8,7 +8,7 @@ This document defines the Application Layer for Scriber API, implementing CQRS p
 - Commands modify state, queries read state (CQRS)
 - Use cases independent of delivery mechanism (HTTP, gRPC, etc.)
 - DTOs for data transfer (never expose domain entities)
-- FluentValidation for input validation
+- Input validation using validation library (FluentValidation, class-validator, Joi, etc.)
 - Pipeline behaviors for cross-cutting concerns
 
 ---
